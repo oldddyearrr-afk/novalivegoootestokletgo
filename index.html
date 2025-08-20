@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Nova - Sports TV</title>
+    <meta name="description" content="منصة Nova الرائدة للبث المباشر والمحتوى الرياضي بجودة عالية - مُحسنة لـ Android TV">
+
+    <!-- Android TV Support -->
+    <meta name="theme-color" content="#8A56E9">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Nova TV">
+
+    <!-- TV App Manifest -->
+    <link rel="manifest" href="data:application/manifest+json,{
+        'name': 'Nova Sports TV',
+        'short_name': 'Nova TV',
+        'description': 'منصة البث الرياضي المباشر',
+        'start_url': '/',
+        'display': 'fullscreen',
+        'orientation': 'landscape',
+        'theme_color': '#8A56E9',
+        'background_color': '#020E1C',
+        'icons': [
+            {
+                'src': 'https://iili.io/FSF1DcG.md.png',
+                'sizes': '192x192',
+                'type': 'image/png'
+            }
+        ]
+    }">
+
+    <!-- Favicon -->
+    <link rel="icon" href="https://iili.io/FSF1DcG.md.png" type="image/png">
+
+
+
+    <!-- Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
+
+    <link href="style.css" rel="stylesheet">
+<body>
+    <!-- Loading Screen -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-container">
+            <div class="loading-logo">
+                <img src="https://iili.io/FSF1DcG.md.png" alt="Nova Logo">
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Page -->
+    <div class="login-page" id="loginPage">
+        <div class="simple-login-container">
+            <div class="simple-login-box">
+                <!-- Logo -->
+                <div class="simple-logo">
+                    <img src="https://iili.io/FSF1DcG.md.png" alt="شعار التطبيق" class="logo-img">
+                </div>
+
+                <!-- Title -->
+                <p class="simple-subtitle">احصل على إمكانية الوصول إلى الأحداث الرياضية المباشرة، أحدث القنوات الناقلة للمباريات بجودة فائقة، والمزيد، تابع بنفسك.</p>
+
+                <!-- Login Form -->
+                <form id="loginForm" class="simple-form">
+                    <div class="simple-input-group">
+                        <input type="text" class="simple-input" id="usernameInput" placeholder="اسم المستخدم" required>
+                    </div>
+
+                    <div class="simple-input-group" id="passwordGroup" style="display: none;">
+                        <input type="password" class="simple-input" id="passwordInput" placeholder="كلمة المرور">
+                    </div>
+
+                    <button type="submit" class="simple-login-btn">
+                        دخول
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- TV App Icon -->
+    <div class="tv-app-icon">
+        <i class="fas fa-tv"></i>
+    </div>
+
+    <!-- TV Navigation Overlay -->
+    <div class="tv-overlay" id="tvOverlay">
+        <div class="tv-message">
+            <h2>Nova Sports TV</h2>
+            <p>مُحسن للعرض على Android TV</p>
+            <p>استخدم الريموت للتنقل بين القوائم</p>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div class="main-app hidden" id="mainApp">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <!-- Left side: Logo and User profile -->
+                <div class="header-left">
+                    <div class="logo" onclick="showSection('live')" style="margin-right: 1rem;" tabindex="0">
+                        <img src="https://iili.io/FSF1DcG.md.png" alt="شعار التطبيق" style="height: 40px; width: auto; object-fit: contain;">
+                    </div>
+                    <div class="user-avatar-simple" id="userAvatar">
+                        <span id="userName">ض</span>
+                    </div>
+                </div>
+
+                <!-- Center: Empty space for balance -->
+                <div class="header-center">
+                </div>
+
+                <!-- Right side: Menu and Premium button -->
+                <div class="header-right">
+                    <button class="premium-btn" onclick="showPremiumMessage()" title="Premium" tabindex="0">
+                        Premium
+                    </button>
+                    <button class="nav-btn" onclick="toggleSidebar()" title="القائمة" tabindex="0">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Live Section -->
+            <section id="liveSection" class="section">
+
+                <!-- Simple Welcome Section -->
+                <div class="simple-welcome-section">
+                    <div class="welcome-container">
+                        <div class="welcome-header">
+                            <div class="app-logo">
+                                <img src="https://iili.io/FSF1DcG.md.png" alt="Nova Logo">
+                            </div>
+                            <h1 class="welcome-title">مرحباً بك في NoVA</h1>
+                            <p class="welcome-subtitle">أفضل تطبيق لمشاهدة القنوات والأحداث الرياضية</p>
+                        </div>
+
+                        <div class="welcome-action">
+                            <button class="welcome-channels-btn" onclick="showSection('channels')" tabindex="0">
+                                <i class="fas fa-play-circle"></i>
+لمُشاهدة القنوات الرياضية
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+
+
+
+
+                <!-- Best of Football Section -->
+                <div class="best-football-section">
+                    <div class="section-header-enhanced">
+                        <div class="section-title-group">
+                            <div class="section-icon">
+                                <i class="fas fa-futbol"></i>
+                            </div>
+                            <div>
+                                <h3 class="section-title">الأحداث الرياضية</h3>
+                                <p class="section-subtitle">أبرز المباريات والأحداث المهمة</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="best-football-slider-container">
+                        <div class="best-football-slider" id="bestOfFootballSlider">
+                            <!-- First Football Event Card -->
+                            <div class="football-event-card">
+                                <div class="card-background" style="background-image: url('https://c.top4top.io/p_3499bjfz31.jpg'); background-size: cover; background-position: center;"></div>
+                                <div class="road-lines"></div>
+
+                                <div class="football-info">
+                                    <div class="football-title">برشلونة ضد ريال مدريد</div>
+                                    <div class="football-subtitle">الكلاسيكو - الدوري الإسباني</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- Channels Section -->
+            <section id="channelsSection" class="section hidden">
+
+                <!-- Main Categories -->
+                <div class="channel-categories-main" id="channelCategoriesMain">
+                    <!-- Search Bar for Main Categories -->
+                    <div class="search-container" style="margin-bottom: 2rem;">
+                        <div class="search-box">
+                            <i class="fas fa-search search-icon" style="font-size: 1.2rem;"></i>
+                            <input type="text" id="mainChannelSearchInput" class="search-input" placeholder="ابحث في جميع القنوات..." onkeyup="filterMainChannels()">
+                            <button class="search-clear" id="mainSearchClearBtn" onclick="clearMainSearch()" style="display: none;">
+                                <i class="fas fa-times-circle" style="font-size: 1.1rem;"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Search Results for Main Page -->
+                    <div class="search-results" id="mainSearchResults" style="display: none;">
+                        <h3 class="search-results-title">نتائج البحث</h3>
+                        <div class="search-results-grid" id="mainSearchResultsGrid"></div>
+                    </div>
+
+                    <div class="channel-categories-grid" id="channelCategoriesGrid">
+                        <!-- Dynamic content will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Sub Pages -->
+                <div class="channel-sub-page" id="channelSubPage">
+                    <div class="channel-sub-header">
+                        <button class="back-btn" onclick="backToChannelCategories()">
+                            <i class="fas fa-chevron-right"></i>
+                            رجوع
+                        </button>
+                        <h3 id="channelSubTitle">القنوات</h3>
+                    </div>
+                    <div class="channel-sub-grid" id="channelSubGrid">
+                        <!-- Dynamic content -->
+                    </div>
+                </div>
+            </section>
+
+
+
+            <!-- Settings Section -->
+            <section id="settingsSection" class="section hidden">
+                <div class="settings-container">
+                    <!-- إعدادات المظهر -->
+                    <div class="settings-section">
+                        <div class="settings-section-header">
+                            <h3 class="settings-section-title">
+                                <i class="fas fa-palette"></i>
+                                المظهر والألوان
+                            </h3>
+                        </div>
+
+
+
+                        <div class="settings-item">
+                            <div class="info">
+                                <div class="title">لون التطبيق</div>
+                                <div class="desc">اختر اللون المُفضل للتطبيق</div>
+                                <div class="color-picker">
+                                    <div class="color-option selected" style="background-color: #ca8a04;" data-color="yellow" onclick="changeThemeColor('yellow')"></div>
+                                    <div class="color-option" style="background-color: #dc2626;" data-color="red" onclick="changeThemeColor('red')"></div>
+                                    <div class="color-option" style="background-color: #2563eb;" data-color="blue" onclick="changeThemeColor('blue')"></div>
+                                    <div class="color-option" style="background-color: #16a34a;" data-color="green" onclick="changeThemeColor('green')"></div>
+                                    <div class="color-option" style="background-color: #db2777;" data-color="pink" onclick="changeThemeColor('pink')"></div>  
+                                    <div class="color-option" style="background-color: #e11d48;" data-color="rose" onclick="changeThemeColor('rose')"></div>   
+                                    <div class="color-option" style="background-color: #c026d3;" data-color="fuchsia" onclick="changeThemeColor('fuchsia')"></div>
+                                    <div class="color-option" style="background-color: #0d9488;" data-color="teal" onclick="changeThemeColor('teal')"></div>                               
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- إعدادات الاستخدام -->
+                    <div class="settings-section">
+                        <div class="settings-section-header">
+                            <h3 class="settings-section-title">
+                                <i class="fas fa-cog"></i>
+                                إعدادات الاستخدام
+                            </h3>
+                        </div>
+
+                        <div class="settings-item">
+                            <div class="info">
+                                <div class="title">الإشعارات</div>
+                                <div class="desc">تفعيل إشعارات التطبيق المهمة</div>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="notificationsSwitch" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+
+
+
+                        <div class="settings-item">
+                            <div class="info">
+                                <div class="title">حفظ البيانات</div>
+                                <div class="desc">تقليل استهلاك البيانات أثناء البث المباشر</div>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="dataSaverSwitch">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- إعدادات الحساب -->
+                    <div class="settings-section">
+                        <div class="settings-section-header">
+                            <h3 class="settings-section-title">
+                                <i class="fas fa-user"></i>
+                                إعدادات الحساب
+                            </h3>
+                        </div>
+
+                        <div class="settings-item">
+                            <div class="info">
+                                <div class="title">تسجيل الخروج</div>
+                                <div class="desc">الخروج من التطبيق والعودة لصفحة تسجيل الدخول</div>
+                            </div>
+                            <button onclick="logout()" class="admin-btn secondary" style="padding: 0.75rem 1.5rem; font-size: 0.9rem; border-radius: 8px;">
+                                <i class="fas fa-sign-out-alt"></i>
+                                خروج
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Footer Section -->
+                    <div class="settings-footer">
+                        <div class="footer-separator"></div>
+                        <div class="footer-content">
+                            <div class="footer-logo">
+                                <img src="https://iili.io/FSF1DcG.md.png" alt="Nova Logo" class="footer-logo-img">
+                                <div class="footer-text">
+                                    <h4 class="footer-app-name">Nova</h4>
+                                    <p class="footer-version">الإصدار 1.0</p>
+                                </div>
+                            </div>
+                            <div class="footer-copyright">
+                                <p>جميع الحقوق محفوظة © 2025</p>
+                                <p class="footer-subtitle">منصة Nova للبث الرياضي المباشر</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+
+
+
+
+
+
+        <!-- Admin Section -->
+            <section id="adminSection" class="section hidden">
+                <div style="max-width: 800px; margin: 0 auto;">
+                    <!-- Admin Data Management Section -->
+                    <div style="border: 1px solid var(--border-primary); border-radius: 6px; padding: 1rem; margin-bottom: 1.5rem;">
+                        <h3 style="color: var(--text-primary); margin-bottom: 0.75rem; font-size: 1rem; font-weight: 500;">
+                            إدارة البيانات
+                        </h3>
+                        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                            <button onclick="autoSaveAllChanges()" class="admin-btn primary">حفظ تلقائي</button>
+                            <button onclick="downloadBackupData()" class="admin-btn secondary">نسخة احتياطية</button>
+                            <button onclick="resetToDefault()" class="admin-btn danger">إعادة تعيين</button>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 2rem;">
+                        <h2 style="font-size: 1.4rem; font-weight: 600; color: var(--text-primary); margin: 0 0 0.5rem 0; text-align: center;">
+                            <i class="fas fa-shield-alt" style="color: var(--accent-primary); margin-left: 0.5rem;"></i>
+                            لوحة التحكم
+                        </h2>
+                        <p style="color: var(--text-secondary); font-size: 0.85rem; margin: 0; text-align: center;">
+                            إدارة الأحداث الرياضية والإعدادات
+                        </p>
+                    </div>
+
+                    <!-- Admin Tabs -->
+                    <div style="display: flex; margin-bottom: 2rem; border-bottom: 1px solid var(--border-primary);">
+                        <button class="admin-tab active" onclick="switchAdminTab('events')" data-tab="events">
+                            <i class="fas fa-futbol"></i>
+                            إدارة الأحداث
+                        </button>
+                        <button class="admin-tab" onclick="switchAdminTab('channels')" data-tab="channels">
+                            <i class="fas fa-tv"></i>
+                            إدارة القنوات
+                        </button>
+                        <button class="admin-tab" onclick="switchAdminTab('backup')" data-tab="backup">
+                            <i class="fas fa-cog"></i>
+                            إدارة النظام
+                        </button>
+                    </div>
+
+
+
+                    <!-- Events Management -->
+                    <div id="adminEventsTab" class="admin-tab-content">
+                        <div style="border: 1px solid var(--border-primary); border-radius: 6px; padding: 1rem; margin-bottom: 1rem;">
+                            <h3 style="color: var(--text-primary); margin-bottom: 1rem; font-size: 1rem; font-weight: 500;">
+                                <i class="fas fa-plus" style="color: var(--accent-primary); margin-left: 0.5rem;"></i>
+                                إضافة حدث رياضي جديد
+                            </h3>
+                            <div style="display: grid; gap: 1rem; margin-bottom: 1rem;">
+                                <input type="text" id="newEventTitle" placeholder="عنوان الحدث (مثل: برشلونة ضد ريال مدريد)" class="admin-input">
+                                <input type="text" id="newEventSubtitle" placeholder="الوصف (مثل: الكلاسيكو - الدوري الإسباني)" class="admin-input">
+                                <input type="text" id="newEventImage" class="admin-input" placeholder="رابط الصورة (اختياري)" onkeyup="previewNewEventImage()">
+                                <!-- معاينة الصورة الجديدة -->
+                                <div id="newEventImagePreview" style="display: none; margin-top: 0.5rem; text-align: center;">
+                                    <img id="newEventImagePreviewImg" src="" alt="معاينة الصورة" style="max-width: 200px; max-height: 150px; border-radius: 8px; border: 1px solid var(--border-primary);">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="newEventLink">الرابط</label>
+                                <div style="display: flex; gap: 0.5rem;">
+                                    <input type="text" id="newEventLink" class="admin-input" placeholder="مثال: go:501 أو http://..." required>
+                                    <button type="button" class="admin-btn secondary" onclick="generateEventNumber()" title="توليد رقم تلقائي">
+                                        <i class="fas fa-magic"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div style="color: var(--text-muted); font-size: 0.85rem; margin-top: -0.5rem;">
+                                <i class="fas fa-info-circle"></i>
+                                استخدم التنسيق go:رقم لإنشاء رابط خاص (مثل: go:500)
+                            </div>
+                            <label style="color: var(--text-primary); font-weight: 600; margin-bottom: 0.5rem;">حالة الحدث:</label>
+                            <select id="newEventStatus" class="admin-input">
+                                <option value="upcoming">قادم</option>
+                                <option value="live">مباشر</option>
+                                <option value="finished">انتهى</option>
+                            </select>
+                            <button onclick="addNewEvent()" class="admin-btn primary">
+                                <i class="fas fa-plus"></i>
+                                إضافة حدث
+                            </button>
+                        </div>
+
+                        <div style="border: 1px solid var(--border-primary); border-radius: 6px; padding: 1rem;">
+                            <h3 style="color: var(--text-primary); margin-bottom: 1rem; font-size: 1rem; font-weight: 500;">
+                                <i class="fas fa-list" style="color: var(--accent-primary); margin-left: 0.5rem;"></i>
+                                الأحداث الرياضية الحالية
+                            </h3>
+                            <div id="eventsList"></div>
+                        </div>
+
+                        <!-- Edit Event Modal -->
+                        <div id="editEventModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 5000; align-items: center; justify-content: center;">
+                            <div style="background: var(--secondary-bg); border: 1px solid var(--border-primary); border-radius: 16px; padding: 2rem; max-width: 500px; width: 90%; max-height: 90vh; overflow-y: auto;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                                    <h3 style="color: var(--text-primary); margin: 0;">تعديل الحدث الرياضي</h3>
+                                    <button onclick="closeEditEventModal()" style="background: none; border: none; color: var(--text-secondary); font-size: 1.5rem; cursor: pointer;">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                                <div style="display: grid; gap: 1rem;">
+                                    <input type="hidden" id="editEventIndex">
+                                    <input type="text" id="editEventTitle" class="admin-input" placeholder="عنوان الحدث">
+                                    <input type="text" id="editEventSubtitle" class="admin-input" placeholder="الوصف">
+                                    <input type="text" id="editEventImage" class="admin-input" placeholder="رابط الصورة (اختياري)" onkeyup="previewEditEventImage()">
+                                    <!-- معاينة الصورة في التعديل -->
+                                    <div id="editEventImagePreview" style="display: none; margin-top: 0.5rem; text-align: center;">
+                                        <img id="editEventImagePreviewImg" src="" alt="معاينة الصورة" style="max-width: 200px; max-height: 150px; border-radius: 8px; border: 1px solid var(--border-primary);">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="editEventLink">الرابط</label>
+                                        <div style="display: flex; gap: 0.5rem;">
+                                            <input type="text" id="editEventLink" class="admin-input" placeholder="مثال: go:501 أو http://..." required>
+                                            <button type="button" class="admin-btn secondary" onclick="generateEditEventNumber()" title="توليد رقم تلقائي">
+                                                <i class="fas fa-magic"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <select id="editEventStatus" class="admin-input">
+                                        <option value="upcoming">قادم</option>
+                                        <option value="live">مباشر</option>
+                                        <option value="finished">انتهى</option>
+                                    </select>
+                                    <button onclick="saveEventChanges()" class="admin-btn primary">
+                                        <i class="fas fa-save"></i>
+                                        حفظ التغييرات
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Channels Management -->
+                    <div id="adminChannelsTab" class="admin-tab-content hidden">
+                        <!-- Categories Management -->
+                        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem;">
+                            <h3 style="color: var(--text-primary); margin-bottom: 1.5rem; font-size: 1.1rem; font-weight: 600; display: flex; align-items: center; gap: 0.75rem;">
+                                <div style="width: 32px; height: 32px; background: rgba(var(--accent-primary), 0.15); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--accent-primary);">
+                                    <i class="fas fa-plus" style="font-size: 0.9rem;"></i>
+                                </div>
+                                إضافة فئة جديدة
+                            </h3>
+                            <div style="display: grid; gap: 1rem;">
+                                <div>
+                                    <label style="color: var(--text-primary); font-weight: 600; margin-bottom: 0.5rem; display: block;">اسم الفئة:</label>
+                                    <input type="text" id="newCategoryTitle" placeholder="مثل: beIN Sports HD" class="admin-input" required>
+                                </div>
+                                <div>
+                                    <label style="color: var(--text-primary); font-weight: 600; margin-bottom: 0.5rem; display: block;">معرف الفئة:</label>
+                                    <input type="text" id="newCategoryId" placeholder="مثل: bein-hd" class="admin-input" required>
+                                    <small style="color: var(--text-muted); font-size: 0.8rem;">يجب أن يكون فريد ولا يحتوي على مسافات</small>
+                                </div>
+                                <div>
+                                    <label style="color: var(--text-primary); font-weight: 600; margin-bottom: 0.5rem; display: block;">الرقم الأساسي:</label>
+                                    <input type="number" id="newCategoryBaseNumber" placeholder="مثل: 100" class="admin-input" required min="1">
+                                    <small style="color: var(--text-muted); font-size: 0.8rem;">رقم البداية للقنوات في هذه الفئة</small>
+                                </div>
+                                <div>
+                                    <label style="color: var(--text-primary); font-weight: 600; margin-bottom: 0.5rem; display: block;">صورة الفئة (اختياري):</label>
+                                    <input type="url" id="newCategoryImage" class="admin-input" placeholder="رابط صورة الفئة" onkeyup="previewNewCategoryImage()">
+                                </div>
+                                <!-- معاينة صورة الفئة -->
+                                <div id="newCategoryImagePreview" style="display: none; margin-top: 0.5rem; text-align: center;">
+                                    <img id="newCategoryImagePreviewImg" src="" alt="معاينة الصورة" style="max-width: 200px; max-height: 150px; border-radius: 8px; border: 1px solid var(--border-primary);">
+                                </div>
+                            </div>
+                            <button onclick="addNewCategory()" class="admin-btn primary" style="margin-top: 1rem;">
+                                <i class="fas fa-plus"></i>
+                                إضافة فئة
+                            </button>
+                        </div>
+
+                        <!-- Categories List -->
+                        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem;">
+                            <h3 style="color: var(--text-primary); margin-bottom: 1.5rem; font-size: 1.1rem; font-weight: 600; display: flex; align-items: center; gap: 0.75rem;">
+                                <div style="width: 32px; height: 32px; background: rgba(var(--accent-primary), 0.15); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--accent-primary);">
+                                    <i class="fas fa-list" style="font-size: 0.9rem;"></i>
+                                </div>
+                                فئات القنوات الحالية
+                            </h3>
+                            <div id="categoriesList"></div>
+                        </div>
+
+                        <!-- Channels Management -->
+                        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 1.5rem;">
+                            <h3 style="color: var(--text-primary); margin-bottom: 1.5rem; font-size: 1.1rem; font-weight: 600; display: flex; align-items: center; gap: 0.75rem;">
+                                <div style="width: 32px; height: 32px; background: rgba(var(--accent-primary), 0.15); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--accent-primary);">
+                                    <i class="fas fa-video" style="font-size: 0.9rem;"></i>
+                                </div>
+                                إدارة القنوات
+                            </h3>
+
+                            <!-- Channel Category Selector -->
+                            <div style="margin-bottom: 1.5rem;">
+                                <label style="color: var(--text-primary); font-weight: 600; margin-bottom: 0.5rem; display: block;">اختر الفئة:</label>
+                                <select id="channelCategorySelect" class="admin-input" onchange="loadChannelsForCategory()">
+                                    <option value="">اختر فئة القنوات...</option>
+                                </select>
+                            </div>
+
+                            <!-- Add Channel Form -->
+                            <div id="addChannelForm" style="display: none; margin-bottom: 1.5rem; padding: 1rem; border: 1px solid var(--border-primary); border-radius: 8px; background: rgba(255, 255, 255, 0.02);">
+                                <h4 style="color: var(--text-primary); margin-bottom: 1rem;">إضافة قناة جديدة</h4>
+                                <div style="display: grid; gap: 1rem;">
+                                    <input type="text" id="newChannelName" placeholder="اسم القناة (مثل: beIN Sports 1 HD)" class="admin-input">
+                                    <input type="text" id="newChannelImage" placeholder="رابط صورة القناة (اختياري)" class="admin-input" onkeyup="previewNewChannelImage()">
+                                    <div id="newChannelImagePreview" style="display: none; text-align: center;">
+                                        <img id="newChannelImagePreviewImg" src="" alt="معاينة الصورة" style="max-width: 150px; max-height: 100px; border-radius: 8px; border: 1px solid var(--border-primary);">
+                                    </div>
+                                    <button onclick="addChannelToCategory()" class="admin-btn primary">
+                                        <i class="fas fa-plus"></i>
+                                        إضافة القناة
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Channels List -->
+                            <div id="channelsList"></div>
+                        </div>
+
+                        <!-- Edit Category Modal -->
+                        <div id="editCategoryModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 5000; align-items: center; justify-content: center;">
+                            <div style="background: var(--secondary-bg); border: 1px solid var(--border-primary); border-radius: 16px; padding: 2rem; max-width: 500px; width: 90%; max-height: 90vh; overflow-y: auto;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                                    <h3 style="color: var(--text-primary); margin: 0;">تعديل الفئة</h3>
+                                    <button onclick="closeEditCategoryModal()" style="background: none; border: none; color: var(--text-secondary); font-size: 1.5rem; cursor: pointer;">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                                <div style="display: grid; gap: 1rem;">
+                                    <input type="hidden" id="editCategoryId">
+                                    <input type="text" id="editCategoryTitle" class="admin-input" placeholder="اسم الفئة">
+                                    <input type="number" id="editCategoryBaseNumber" class="admin-input" placeholder="الرقم الأساسي">
+                                    <input type="text" id="editCategoryImage" class="admin-input" placeholder="رابط الصورة" onkeyup="previewEditCategoryImage()">
+                                    <div id="editCategoryImagePreview" style="display: none; text-align: center;">
+                                        <img id="editCategoryImagePreviewImg" src="" alt="معاينة الصورة" style="max-width: 200px; max-height: 150px; border-radius: 8px; border: 1px solid var(--border-primary);">
+                                    </div>
+                                    <button onclick="saveCategoryChanges()" class="admin-btn primary">
+                                        <i class="fas fa-save"></i>
+                                        حفظ التغييرات
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- System Management -->
+                    <div id="adminBackupTab" class="admin-tab-content hidden">
+                        <div style="display: grid; gap: 2rem;">
+                            <div style="background: rgba(255, 71, 87, 0.1); border: 1px solid rgba(255, 71, 87, 0.3); border-radius: 16px; padding: 2rem;">
+                                <h3 style="color: #ff4757; margin-bottom: 1rem;">إعادة تعيين البيانات</h3>
+                                <p style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.9rem;">
+                                    حذف جميع البيانات والعودة للإعدادات الافتراضية
+                                </p>
+                                <button onclick="resetToDefault()" class="admin-btn danger">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    إعادة تعيين للافتراضي
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h3 class="sidebar-title">القائمة</h3>
+            <button class="close-btn" onclick="toggleSidebar()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="menu-section">
+                <a href="#" class="menu-item" onclick="showSection('live'); closeSidebar();">
+                    <i class="fas fa-home"></i>
+                    <span>الرئيسية</span>
+                </a>
+                <a href="#" class="menu-item" onclick="showSection('channels'); closeSidebar();">
+                    <i class="fas fa-tv"></i>
+                    <span>القنوات</span>
+                </a>
+                <a href="#" class="menu-item" onclick="showSection('settings'); closeSidebar();">
+                    <i class="fas fa-cog"></i>
+                    <span>الإعدادات</span>
+                </a>
+                <a href="#" class="menu-item admin-only" id="adminMenuItem" onclick="showSection('admin'); closeSidebar();" style="display: none;">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>لوحة التحكم</span>
+                </a>
+            </div>
+
+            <div class="menu-footer">
+                <a href="https://t.me/NovaSporrt" target="_blank" rel="noopener noreferrer" class="contact-link">
+                    <i class="fab fa-telegram-plane"></i>
+                    <span>الدعم الفني</span>
+                </a>
+            </div>
+        </nav>
+    </aside>
+
+
+
+    <!-- Notification Container -->
+    <div class="notification-container" id="notificationContainer">
+        <!-- Notifications will be dynamically added here -->
+    </div>
+
+    <script src="script.js"></script>
+    </body>
+</html>
