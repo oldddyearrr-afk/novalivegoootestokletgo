@@ -6,12 +6,14 @@ import json
 from datetime import datetime
 from pathlib import Path
 import uuid
+import psutil
 
 app = Flask(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent
 LOGS_DIR = BASE_DIR / "logs"
 TELEGRAM_STREAMS_FILE = BASE_DIR / "telegram_streams.json"
+PROCESSES = {}
 
 def load_telegram_streams():
     """تحميل قائمة بثوث تليجرام من الملف"""
@@ -28,12 +30,10 @@ def save_telegram_streams(streams):
 def get_stream_status(session_name):
     """التحقق من حالة بث معين"""
     try:
-        result = subprocess.run(
-            ['tmux', 'has-session', '-t', session_name],
-            capture_output=True,
-            text=True
-        )
-        return result.returncode == 0
+        if session_name in PROCESSES:
+            proc = PROCESSES[session_name]
+            return proc.poll() is None
+        return False
     except:
         return False
 
@@ -83,54 +83,42 @@ def api_telegram_add_stream():
         streams.append(new_stream)
         save_telegram_streams(streams)
         
-        # إنشاء سكريبت مؤقت للبث مع إعادة اتصال تلقائية
-        temp_script = f"/tmp/tg_stream_{stream_id}.sh"
-        with open(temp_script, 'w') as f:
-            f.write(f"""#!/bin/bash
-SOURCE="{source_url if source_url else 'http://soft24f.net/live/6872c3410e8cibopro/22bcpapc/237014.ts'}"
-RTMP_URL="{stream_key}"
-
-# حلقة لا نهائية لإعادة الاتصال التلقائي عند الانقطاع
-while true; do
-    echo "=========================================="
-    echo "بدء البث: $(date)"
-    echo "=========================================="
-    
-    ffmpeg -hide_banner -loglevel error \\
-      -reconnect 1 -reconnect_streamed 1 -reconnect_at_eof 1 \\
-      -reconnect_delay_max 10 \\
-      -timeout 30000000 \\
-      -fflags +genpts \\
-      -analyzeduration 5000000 -probesize 5000000 \\
-      -i "$SOURCE" \\
-      -c:v libx264 -preset ultrafast -tune zerolatency \\
-      -profile:v baseline -level 3.1 \\
-      -vf "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=25,drawtext=text='t.me/xl9rr':fontsize=30:fontcolor=white@0.85:shadowcolor=black@0.3:shadowx=1:shadowy=1:x=w-mod(t*120\\,w+tw):y=h-th-40" \\
-      -b:v 1800k -maxrate 2000k -bufsize 3600k \\
-      -g 50 -keyint_min 25 -sc_threshold 0 \\
-      -pix_fmt yuv420p \\
-      -c:a aac -b:a 96k -ar 44100 -ac 2 \\
-      -af "aresample=async=1" \\
-      -bsf:v h264_mp4toannexb \\
-      -f flv "$RTMP_URL"
-    
-    EXIT_CODE=\$?
-    echo "=========================================="
-    echo "البث توقف: $(date) - كود الخروج: \$EXIT_CODE"
-    echo "إعادة الاتصال خلال 10 ثوانٍ..."
-    echo "=========================================="
-    sleep 10
-done
-""")
+        # إنشاء ملف لوج للبث
+        log_file = LOGS_DIR / f"stream_{stream_id}.log"
         
-        os.chmod(temp_script, 0o755)
+        # إعداد أمر FFmpeg
+        source = source_url if source_url else 'http://soft24f.net/live/6872c3410e8cibopro/22bcpapc/237014.ts'
         
-        # بدء البث في جلسة tmux
-        subprocess.Popen(
-            ['tmux', 'new-session', '-d', '-s', session_name, temp_script],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
+        ffmpeg_cmd = [
+            'ffmpeg', '-hide_banner', '-loglevel', 'error',
+            '-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_at_eof', '1',
+            '-reconnect_delay_max', '10',
+            '-timeout', '30000000',
+            '-fflags', '+genpts',
+            '-analyzeduration', '5000000', '-probesize', '5000000',
+            '-i', source,
+            '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'zerolatency',
+            '-profile:v', 'baseline', '-level', '3.1',
+            '-vf', "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=25,drawtext=text='t.me/xl9rr':fontsize=30:fontcolor=white@0.85:shadowcolor=black@0.3:shadowx=1:shadowy=1:x=w-mod(t*120\\,w+tw):y=h-th-40",
+            '-b:v', '1800k', '-maxrate', '2000k', '-bufsize', '3600k',
+            '-g', '50', '-keyint_min', '25', '-sc_threshold', '0',
+            '-pix_fmt', 'yuv420p',
+            '-c:a', 'aac', '-b:a', '96k', '-ar', '44100', '-ac', '2',
+            '-af', 'aresample=async=1',
+            '-bsf:v', 'h264_mp4toannexb',
+            '-f', 'flv', stream_key
+        ]
+        
+        # بدء البث في الخلفية
+        with open(log_file, 'w') as log:
+            proc = subprocess.Popen(
+                ffmpeg_cmd,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                preexec_fn=os.setpgrp if os.name != 'nt' else None
+            )
+        
+        PROCESSES[session_name] = proc
         
         import time
         time.sleep(4)
@@ -160,7 +148,14 @@ def api_telegram_stop_stream(stream_id):
         if not stream:
             return jsonify({'success': False, 'error': 'البث غير موجود'}), 404
         
-        subprocess.run(['tmux', 'kill-session', '-t', stream['session_name']], check=False)
+        if stream['session_name'] in PROCESSES:
+            proc = PROCESSES[stream['session_name']]
+            try:
+                proc.terminate()
+                proc.wait(timeout=5)
+            except:
+                proc.kill()
+            del PROCESSES[stream['session_name']]
         
         import time
         time.sleep(1)
@@ -182,8 +177,14 @@ def api_telegram_delete_stream(stream_id):
         if not stream:
             return jsonify({'success': False, 'error': 'البث غير موجود'}), 404
         
-        if stream['status'] == 'running':
-            subprocess.run(['tmux', 'kill-session', '-t', stream['session_name']], check=False)
+        if stream['session_name'] in PROCESSES:
+            proc = PROCESSES[stream['session_name']]
+            try:
+                proc.terminate()
+                proc.wait(timeout=5)
+            except:
+                proc.kill()
+            del PROCESSES[stream['session_name']]
         
         streams = [s for s in streams if s['id'] != stream_id]
         save_telegram_streams(streams)
@@ -202,18 +203,12 @@ def api_telegram_stream_logs(stream_id):
         if not stream:
             return jsonify({'error': 'البث غير موجود'}), 404
         
-        try:
-            result = subprocess.run(
-                ['tmux', 'capture-pane', '-t', stream['session_name'], '-p', '-S', '-50'],
-                capture_output=True,
-                text=True,
-                check=False
-            )
-            if result.returncode == 0:
-                logs = result.stdout.split('\n')
-                return jsonify({'logs': logs})
-        except:
-            pass
+        log_file = LOGS_DIR / f"stream_{stream_id}.log"
+        
+        if log_file.exists():
+            with open(log_file, 'r') as f:
+                logs = f.readlines()[-50:]
+                return jsonify({'logs': [log.strip() for log in logs]})
         
         return jsonify({'logs': ['لا توجد سجلات متاحة']})
     except Exception as e:
