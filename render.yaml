@@ -4,11 +4,8 @@ services:
     name: telegram-stream-controller
     runtime: python
     plan: starter
-    buildCommand: |
-      apt-get update
-      apt-get install -y ffmpeg
-      pip install -r requirements.txt
-    startCommand: gunicorn web_app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 300 --access-logfile - --error-logfile -
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn web_app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 300 --keepalive 5 --access-logfile - --error-logfile -
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
