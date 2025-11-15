@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 from flask import Flask, render_template, jsonify, request
 import subprocess
@@ -6,7 +7,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 import uuid
-import psutil
+import signal
 
 app = Flask(__name__)
 
@@ -18,14 +19,24 @@ PROCESSES = {}
 def load_telegram_streams():
     """تحميل قائمة بثوث تليجرام من الملف"""
     if TELEGRAM_STREAMS_FILE.exists():
-        with open(TELEGRAM_STREAMS_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
+        try:
+            with open(TELEGRAM_STREAMS_FILE, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+                if not content:
+                    return []
+                return json.loads(content)
+        except (json.JSONDecodeError, Exception):
+            # في حالة الملف التالف، نرجع قائمة فارغة ونعيد إنشاء الملف
+            return []
     return []
 
 def save_telegram_streams(streams):
     """حفظ قائمة بثوث تليجرام"""
-    with open(TELEGRAM_STREAMS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(streams, f, ensure_ascii=False, indent=2)
+    try:
+        with open(TELEGRAM_STREAMS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(streams, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"⚠️ خطأ في حفظ البيانات: {e}")
 
 def get_stream_status(session_name):
     """التحقق من حالة بث معين"""
@@ -109,19 +120,19 @@ def api_telegram_add_stream():
             '-f', 'flv', stream_key
         ]
         
-        # بدء البث في الخلفية
+        # بدء البث في الخلفية مباشرة بدون tmux
         with open(log_file, 'w') as log:
             proc = subprocess.Popen(
                 ffmpeg_cmd,
                 stdout=log,
                 stderr=subprocess.STDOUT,
-                preexec_fn=os.setpgrp if os.name != 'nt' else None
+                preexec_fn=os.setsid if hasattr(os, 'setsid') else None
             )
         
         PROCESSES[session_name] = proc
         
         import time
-        time.sleep(4)
+        time.sleep(3)
         
         # تحديث الحالة
         if get_stream_status(session_name):
@@ -133,7 +144,7 @@ def api_telegram_add_stream():
         else:
             streams = [s for s in streams if s['id'] != stream_id]
             save_telegram_streams(streams)
-            return jsonify({'success': False, 'error': 'فشل بدء البث'}), 500
+            return jsonify({'success': False, 'error': 'فشل بدء البث - تحقق من الرابط والمصدر'}), 500
             
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -151,10 +162,16 @@ def api_telegram_stop_stream(stream_id):
         if stream['session_name'] in PROCESSES:
             proc = PROCESSES[stream['session_name']]
             try:
-                proc.terminate()
+                if hasattr(os, 'killpg'):
+                    os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                else:
+                    proc.terminate()
                 proc.wait(timeout=5)
             except:
-                proc.kill()
+                if hasattr(os, 'killpg'):
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                else:
+                    proc.kill()
             del PROCESSES[stream['session_name']]
         
         import time
@@ -163,7 +180,7 @@ def api_telegram_stop_stream(stream_id):
         stream['status'] = 'stopped'
         save_telegram_streams(streams)
         
-        return jsonify({'success': True, 'message': 'تم إيقاف البث'})
+        return jsonify({'success': True, 'message': 'تم إيقاف البث بنجاح ✅'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -180,16 +197,26 @@ def api_telegram_delete_stream(stream_id):
         if stream['session_name'] in PROCESSES:
             proc = PROCESSES[stream['session_name']]
             try:
-                proc.terminate()
+                if hasattr(os, 'killpg'):
+                    os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                else:
+                    proc.terminate()
                 proc.wait(timeout=5)
             except:
-                proc.kill()
+                if hasattr(os, 'killpg'):
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                else:
+                    proc.kill()
             del PROCESSES[stream['session_name']]
         
         streams = [s for s in streams if s['id'] != stream_id]
         save_telegram_streams(streams)
         
-        return jsonify({'success': True, 'message': 'تم حذف البث'})
+        log_file = LOGS_DIR / f"stream_{stream_id}.log"
+        if log_file.exists():
+            log_file.unlink()
+        
+        return jsonify({'success': True, 'message': 'تم حذف البث بنجاح ✅'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
